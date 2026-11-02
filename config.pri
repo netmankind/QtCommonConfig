@@ -1,6 +1,6 @@
 # ============================================================
 # config.pri —— 通用工程配置（qmake）
-# 适用：Qt 5.15 / Qt 6.x，Windows / Linux / macOS，MSVC / MinGW / GCC / Clang
+# 适用：Qt 5.15 / Qt 6.x，Windows / Linux / macOS / Android，MSVC / MinGW / GCC / Clang
 #
 # 用法：在主 .pro 中  include($$PWD/config.pri)
 #   可选开关（需写在 include 之前）：
@@ -14,6 +14,9 @@
 #     CONFIG += version_stamp     # 每次构建后删除版本目标文件以刷新版本号（需工程自带版本源文件）
 #   其他变量：
 #     VERSION_FILE_BASENAME = xxx  # 版本文件名（不含扩展名），默认 version
+#     ANDROID_ABIS = arm64-v8a ... # Android 构建 ABI，默认 arm64-v8a
+#     ANDROID_MIN_SDK_VERSION = 21      # Android 最低 SDK，默认 21
+#     ANDROID_TARGET_SDK_VERSION = 33    # Android 目标 SDK，默认 33
 # ============================================================
 
 # ============================================================
@@ -190,6 +193,25 @@ my-linux-arm-qt|linux-arm-gnueabi-g++ {
 macx {
     DIR_PLATFORM = macOS
     contains(QT_ARCH, arm64): DIR_PLATFORM = macOS-arm64
+}
+# ---------- Android（构建主机可为 Windows / Linux，目标为 Android） ----------
+# qmake 中用 android scope 命中；NDK 工具链已由 Qt mkspecs（android-clang）配置好，
+# 这里只补充平台标识与打包常用变量默认值，工程可在 include 之前覆盖。
+android {
+    DIR_PLATFORM  = Android
+    # 覆盖第七节识别出的 CLANGxx，明确为 Android NDK 工具链
+    DIR_COMPILER  = Android
+    TOOLCHAIN_TAG = android
+
+    # 默认构建 ABI：arm64-v8a（现代设备主流）
+    # 工程可在 include 前覆盖为多 ABI：ANDROID_ABIS = arm64-v8a armeabi-v7a x86_64
+    isEmpty(ANDROID_ABIS): ANDROID_ABIS = arm64-v8a
+
+    # 默认 SDK 版本（工程可覆盖）
+    isEmpty(ANDROID_MIN_SDK_VERSION):    ANDROID_MIN_SDK_VERSION = 21
+    isEmpty(ANDROID_TARGET_SDK_VERSION): ANDROID_TARGET_SDK_VERSION = 33
+
+    # Android 下 win32: 分支自然不触发，无需手动关闭 console/windows 子系统与 windeployqt
 }
 
 # ============================================================
