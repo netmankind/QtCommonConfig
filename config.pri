@@ -29,8 +29,9 @@ CONFIG *= resources_big
 CONFIG *= gif
 # 单配置构建：去掉空的 debug / release 目录
 CONFIG -= debug_and_release
-# 多语言：自动调用 lrelease 生成 qm（无 TRANSLATIONS 时不产生副作用）
+# 多语言：lrelease负责生成.qm文件，embed_translations负责把生成的.qm塞进可执行文件的资源系统（无 TRANSLATIONS 时不产生副作用）
 CONFIG *= lrelease
+#CONFIG *= embed_translations
 # 预编译头支持（Qt6 qmake 不支持该特性，仅 Qt5 启用；具体头文件由工程 PRECOMPILED_HEADER 指定）
 !greaterThan(QT_MAJOR_VERSION, 5): CONFIG *= precompile_header
 
@@ -45,6 +46,15 @@ DEFINES *= QT_DEPRECATED_WARNINGS
     greaterThan(QT_MAJOR_VERSION, 5): DEFINES *= QT_DISABLE_DEPRECATED_UP_TO=0x050F00
 }
 
+DEFINES *= QT_USE_QSTRINGBUILDER      # QString 的 a+b 走 QStringBuilder 优化拼接，官方推荐
+
+CONFIG(strict_qt) {
+    DEFINES *= QT_STRICT_ITERATORS    # 迭代器 const/可变混用报错，帮助抓隐患
+}
+# 需要代码纪律更强的可自行打开（会大量拒绝隐式转换/关键字冲突，老代码需清理）：
+# DEFINES *= QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII QT_NO_KEYWORDS
+
+
 # ============================================================
 # 二、编译器通用选项
 # ============================================================
@@ -54,7 +64,15 @@ win32-msvc* {
     QMAKE_CXXFLAGS += /utf-8
     # /MP：多进程并行编译，显著提升多文件工程编译速度
     QMAKE_CXXFLAGS += /MP
-    # 静态链接CRT默认动态链接 /MD、/MDd），CRT指C/C++运行时库（`vcruntime140.dll`、`msvcp140.dll` 等）
+    #让 MSVC 正确报告 __cplusplus 宏（否则永远报 199711L，影响大量现代库的版本探测）
+    QMAKE_CXXFLAGS += /Zc:__cplusplus
+    # /permissive-：严格标准合规；老第三方头文件若报警可去掉这一行
+    QMAKE_CXXFLAGS += /permissive-
+    # MSVC Release 默认不带符号，崩溃 dump 无法符号化。/Zi 生成独立 PDB 且不影响优化
+    # 链接侧 /DEBUG 输出 PDB；注意开启 /DEBUG 后链接器默认变回 /OPT:NOREF /OPT:NOICF，要显式补回裁剪选项
+    QMAKE_CXXFLAGS_RELEASE += /Zi
+    QMAKE_LFLAGS_RELEASE   += /DEBUG /OPT:REF /OPT:ICF
+    # 静态链接CRT默认动态链接（/MD、/MDd），CRT指C/C++运行时库（`vcruntime140.dll`、`msvcp140.dll` 等）
     CONFIG(static_runtime) {
         QMAKE_CXXFLAGS_DEBUG   += /MTd
         QMAKE_CXXFLAGS_RELEASE += /MT
@@ -65,6 +83,13 @@ win32-g++|gcc|clang {
     # 统一源码字符集为 UTF-8
     QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
 }
+# -fexec-charset是 GCC 专属 flag（clang 直到很新的版本才支持）
+# 如果clang版本较旧，改为下面的，gcc scope 覆盖 MinGW/所有 GCC；clang 不再被带进来
+#gcc {
+#    QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
+#}
+
+
 # ---------- 警告级别 ----------
 !CONFIG(no_warnings) {
     win32-msvc* {
@@ -79,15 +104,18 @@ win32-g++|gcc|clang {
 
 # ============================================================
 # 三、Qt6 MSVC qmake 系统库补全
+# ============================================================
 # Qt6 的 qmake 不会把 mkspecs 里 QMAKE_LIBS_GUI 的系统库自动加到链接行，
 # 而 Qt5 qmake 会自动加。这里仅对 Qt6 + MSVC 补齐，避免 LNK2019
 # （SetWindowPos、GetWindowLongPtrW 等均位于 user32）
-# ============================================================
 win32-msvc*:greaterThan(QT_MAJOR_VERSION, 5) {
     LIBS += gdi32.lib comdlg32.lib oleaut32.lib imm32.lib winmm.lib \
             ws2_32.lib ole32.lib uuid.lib user32.lib advapi32.lib
 }
-
+#MinGW 构建的 exe 默认依赖 libgcc_s_seh-1.dll、libstdc++-6.dll，windeployqt 会多拷两个 DLL；链接期直接静态进来更省事
+win32-g++ {
+    QMAKE_LFLAGS += -static-libgcc -static-libstdc++
+}
 # ============================================================
 # 四、打印系统信息
 # ============================================================
@@ -191,8 +219,8 @@ my-linux-arm-qt|linux-arm-gnueabi-g++ {
 }
 # ---------- macOS ----------
 macx {
-    DIR_PLATFORM = macOS
-    contains(QT_ARCH, arm64): DIR_PLATFORM = macOS-arm64
+    DIR_PLATFORM = MacOS
+    contains(QT_ARCH, arm64): DIR_PLATFORM = MacOS-arm64
 }
 # ---------- Android（构建主机可为 Windows / Linux，目标为 Android） ----------
 # qmake 中用 android scope 命中；NDK 工具链已由 Qt mkspecs（android-clang）配置好，
@@ -211,7 +239,11 @@ android {
     isEmpty(ANDROID_MIN_SDK_VERSION):    ANDROID_MIN_SDK_VERSION = 21
     isEmpty(ANDROID_TARGET_SDK_VERSION): ANDROID_TARGET_SDK_VERSION = 33
 
-    # Android 下 win32: 分支自然不触发，无需手动关闭 console/windows 子系统与 windeployqt
+    #qmake 有专门的 Android 版本变量，写进 Manifest，系统设置里能看到人类可读版本
+    isEmpty(ANDROID_VERSION_NAME): ANDROID_VERSION_NAME = $$VERSION
+    isEmpty(ANDROID_VERSION_CODE): ANDROID_VERSION_CODE = 1
+    # 自带打包模板目录时：
+    # ANDROID_PACKAGE_SOURCE_DIR = $$PWD/android
 }
 
 # ============================================================
@@ -243,24 +275,37 @@ equals(TEMPLATE, app) {
 # ============================================================
 # 十一、中间文件目录（moc / rcc / ui / obj）
 # ============================================================
-MOC_DIR     = $${DIR_COMPILEMODE}/moc
-RCC_DIR     = $${DIR_COMPILEMODE}/rcc
-UI_DIR      = $${DIR_COMPILEMODE}/ui
-OBJECTS_DIR = $${DIR_COMPILEMODE}/obj
-
+android {
+    MOC_DIR      = $${QT_ARCH}/$${DIR_COMPILEMODE}/moc
+    RCC_DIR      = $${QT_ARCH}/$${DIR_COMPILEMODE}/rcc
+    UI_DIR       = $${QT_ARCH}/$${DIR_COMPILEMODE}/ui
+    OBJECTS_DIR  = $${QT_ARCH}/$${DIR_COMPILEMODE}/obj
+    QMLCACHE_DIR = $${QT_ARCH}/$${DIR_COMPILEMODE}/qmlcache
+} else {
+    MOC_DIR      = $${DIR_COMPILEMODE}/moc
+    RCC_DIR      = $${DIR_COMPILEMODE}/rcc
+    UI_DIR       = $${DIR_COMPILEMODE}/ui
+    OBJECTS_DIR  = $${DIR_COMPILEMODE}/obj
+    QMLCACHE_DIR = $${DIR_COMPILEMODE}/qmlcache
+}
 # ============================================================
 # 十二、输出目录（工程上层目录的影子构建产物目录）
 # ============================================================
-DEST_LIB = $$clean_path($$PWD/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
-DESTDIR  = $$clean_path($$PWD/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
-
+!android {
+    DEST_LIB = $$clean_path($$PWD/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
+    DESTDIR  = $$clean_path($$PWD/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
+}
 # ============================================================
-# 十三、多语言 qm 输出目录（exe 同级 translations/）
+# 十三、多语言 qm 输出目录
 # 必须放在 DESTDIR 定义之后
 # ============================================================
 !CONFIG(no_translations) {
-    LRELEASE_DIR = $$DESTDIR/translations
-    !exists($$LRELEASE_DIR): mkpath($$LRELEASE_DIR)
+    !android {
+        LRELEASE_DIR = $$DESTDIR/translations
+        !exists($$LRELEASE_DIR): mkpath($$LRELEASE_DIR)
+    } else {
+        #LRELEASE_DIR = $${QT_ARCH}/translations
+    }
 }
 
 # ============================================================
@@ -286,4 +331,45 @@ CONFIG(version_stamp) {
     } else {
         QMAKE_POST_LINK += $$QMAKE_DEL_FILE $$system_path($$VERSION_OBJ) || exit 0 $$escape_expand(\\n\\t)
     }
+}
+
+# ============================================================
+# 十六、可选：git 哈希注入版本，非 git 工程自动回退，不报错
+# 代码里 qDebug() << APP_BUILD_GIT 即可打出构建来源。
+# .git 不在 config.pri 所在目录及其祖先时，工程在 include 前覆盖：GIT_REPO_DIR = $$PWD/../..
+# ============================================================
+isEmpty(GIT_REPO_DIR): GIT_REPO_DIR = $$PWD
+
+win32: GIT_SILENT = 2>nul
+else:  GIT_SILENT = 2>/dev/null          # 灭掉 fatal / “git 不是内部或外部命令”
+
+GIT_HASH = $$system(git -C $$system_path($$GIT_REPO_DIR) rev-parse --short HEAD $$GIT_SILENT)
+isEmpty(GIT_HASH): GIT_HASH = dev         # 非 git 工程 / git 不在 PATH → 统一回退值
+
+DEFINES    += APP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # C++ 里：QString hash = APP_BUILD_GIT;
+QMAKE_RCFLAGS += /DAPP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # 顺带传给 rc.exe（见下）
+
+
+# ============================================================
+# 十七、Windows 版本信息与图标（qmake 自动生成 .rc 并链接）
+# ============================================================
+win32 {
+    QMAKE_RC *= -c 65001    #详细信息里正确显示中文
+    isEmpty(RC_FILE): {
+        #用 RC_FILE 后，QMAKE_TARGET_* / RC_ICONS / VERSION 等变量失效
+        isEmpty(VERSION): VERSION = 1.0.0.20261026    # major.minor.patch.build
+        isEmpty(QMAKE_TARGET_COMPANY):     QMAKE_TARGET_COMPANY     = "中地装（重庆）地质装备有限公司"
+        isEmpty(QMAKE_TARGET_PRODUCT):     QMAKE_TARGET_PRODUCT     = $$PROJECT_NAME
+        isEmpty(QMAKE_TARGET_DESCRIPTION): QMAKE_TARGET_DESCRIPTION = $$PROJECT_NAME
+        isEmpty(QMAKE_TARGET_COPYRIGHT):   QMAKE_TARGET_COPYRIGHT   = "Copyright 2026 中地装（重庆）地质装备有限公司"
+
+        RC_LANG      = 0x0804                    # 简体中文；纯英文项目改 0x0409
+        #RC_CODEPAGE = 1200 #UTF-16（Unicode）
+        #RC_CODEPAGE  = 936                       # 字符串含中文时用 GBK；.pro 存 UTF-8 且含中文需自查乱码
+        #RC_LANG = 0x0004   #中文（不区分简繁）
+
+        #RC_ICONS = resources\images\spring_leaf.ico  # 程序图标
+    }
+} else {
+    VERSION = 1.0.0    # major.minor.patch
 }
