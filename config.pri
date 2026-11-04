@@ -122,7 +122,7 @@ win32-g++ {
 message("Computer system OS:"$$QMAKE_HOST.os)
 message("CPU cores:"$$QMAKE_HOST.cpu_count)
 message("Qt Version="$$[QT_VERSION])
-message("build for "$$QT_ARCH)
+message("QT_ARCH "$$QT_ARCH)
 
 # ============================================================
 # 五、获取工程名
@@ -179,14 +179,17 @@ isEmpty(TARGET) {
 # ============================================================
 # 七、操作系统位数与编译器标识
 # ============================================================
-contains(QT_ARCH, x86_64)|contains(QT_ARCH, arm64)|contains(QT_ARCH, aarch64) {
+contains(QT_ARCH, x86_64)|contains(QT_ARCH, arm64)|contains(QT_ARCH, aarch64)|\
+contains(QT_ARCH, riscv64)|contains(QT_ARCH, mips64)|contains(QT_ARCH, arm64-v8a) {
     BITS = 64
-} else: contains(QT_ARCH, i.86) {
+} else: contains(QT_ARCH, i.86)|contains(QT_ARCH, x86)|contains(QT_ARCH, arm)|\
+        contains(QT_ARCH, mips)|contains(QT_ARCH, riscv32)|contains(QT_ARCH, armeabi-v7a) {
     BITS = 32
 } else {
     BITS =
     message(警告: 未识别的架构 $$QT_ARCH)
 }
+
 gcc {
     DIR_COMPILER = GCC$$BITS
 } else: msvc {
@@ -248,7 +251,7 @@ macx {
 # 这里只补充平台标识与打包常用变量默认值，工程可在 include 之前覆盖。
 android {
     DIR_PLATFORM  = Android
-    # 覆盖第七节识别出的 CLANGxx，明确为 Android NDK 工具链
+    # 覆盖第七节识别出的，明确为 Android NDK 工具链
     DIR_COMPILER  = Android
     TOOLCHAIN_TAG = android
 
@@ -361,17 +364,16 @@ CONFIG(version_stamp) {
 # 代码里 qDebug() << APP_BUILD_GIT 即可打出构建来源。
 # .git 不在 config.pri 所在目录及其祖先时，工程在 include 前覆盖：GIT_REPO_DIR = $$PWD/../..
 # ============================================================
-isEmpty(GIT_REPO_DIR): GIT_REPO_DIR = $$PWD
+isEmpty(GIT_REPO_DIR): GIT_REPO_DIR = $$PROJECT_DIR
 
-win32: GIT_SILENT = 2>nul
-else:  GIT_SILENT = 2>/dev/null          # 灭掉 fatal / “git 不是内部或外部命令”
+equals(QMAKE_HOST.os, Windows): GIT_SILENT = 2>nul
+else: GIT_SILENT = 2>/dev/null           # 灭掉 fatal / "git 不是内部或外部命令"
 
 GIT_HASH = $$system(git -C $$system_path($$GIT_REPO_DIR) rev-parse --short HEAD $$GIT_SILENT)
 isEmpty(GIT_HASH): GIT_HASH = dev         # 非 git 工程 / git 不在 PATH → 统一回退值
 
 DEFINES    += APP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # C++ 里：QString hash = APP_BUILD_GIT;
-QMAKE_RCFLAGS += /DAPP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # 顺带传给 rc.exe（见下）
-
+QMAKE_RCFLAGS += /DAPP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # 顺带传给 rc.exe
 
 # ============================================================
 # 十七、Windows 版本信息与图标（qmake 自动生成 .rc 并链接）
@@ -380,18 +382,15 @@ win32 {
     QMAKE_RC *= -c 65001    #详细信息里正确显示中文
     isEmpty(RC_FILE): {
         #用 RC_FILE 后，QMAKE_TARGET_* / RC_ICONS / VERSION 等变量失效
-        isEmpty(VERSION): VERSION = 1.0.0.20261026    # major.minor.patch.build
+        isEmpty(VERSION): VERSION = 1.0.0.0    # major.minor.patch.build
         isEmpty(QMAKE_TARGET_COMPANY):     QMAKE_TARGET_COMPANY     = "中地装（重庆）地质装备有限公司"
         isEmpty(QMAKE_TARGET_PRODUCT):     QMAKE_TARGET_PRODUCT     = $$PRODUCT_NAME
         isEmpty(QMAKE_TARGET_DESCRIPTION): QMAKE_TARGET_DESCRIPTION = $$PRODUCT_NAME
         isEmpty(QMAKE_TARGET_COPYRIGHT):   QMAKE_TARGET_COPYRIGHT   = "Copyright 2026 中地装（重庆）地质装备有限公司"
-
         RC_LANG      = 0x0804                    # 简体中文；纯英文项目改 0x0409
-        #RC_CODEPAGE = 1200 #UTF-16（Unicode）
+        RC_CODEPAGE = 1200 #Unicode
         #RC_CODEPAGE  = 936                       # 字符串含中文时用 GBK；.pro 存 UTF-8 且含中文需自查乱码
         #RC_LANG = 0x0004   #中文（不区分简繁）
-
-        #RC_ICONS = resources\images\spring_leaf.ico  # 程序图标
     }
 } else {
     VERSION = 1.0.0    # major.minor.patch
