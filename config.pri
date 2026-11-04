@@ -126,33 +126,54 @@ message("build for "$$QT_ARCH)
 
 # ============================================================
 # 五、获取工程名
+# 【关键】在“被 include 的 .pri”里，$$PWD 指向的是 .pri 自己所在的目录，
+# 而不是工程的 .pro 所在目录。config.pri 一旦被放到共享目录（如 QtCommonConfig）
+# 再被各工程 include，用 $$PWD 推导工程名/输出目录会全部落到共享目录上。
+# 因此这里统一使用 qmake 内置变量：
+#   $$_PRO_FILE_      = 当前正在被构建的 .pro 的完整路径（最准确）
+#   $$_PRO_FILE_PWD_  = 当前正在被构建的 .pro 所在目录
+# 且不再用“取目录里第一个 .pro”的兜底（多个 .pro 时会按字母序选错工程）。
 # ============================================================
-DIR_NAME = $$basename(PWD)                          # 当前目录名（basename 收变量名，PWD 前不加 $$）
-CANDIDATE = $$PWD/$${DIR_NAME}.pro                  # 拼出候选路径（exists() 收"值"）
-exists($$CANDIDATE) {
-    MAIN_PROJECT = $$DIR_NAME                       # 目录名 == 工程名 → 直接用
-} else {
-    PRO_LIST     = $$files($$PWD/*.pro)             # 取根目录第一个 .pro 去后缀
-    MAIN_PRO     = $$first(PRO_LIST)
-    PRO_BASE     = $$basename(MAIN_PRO)
-    MAIN_PROJECT = $$replace(PRO_BASE, \.pro$, "")
+PROJECT_DIR = $$_PRO_FILE_PWD_                                # 工程目录（.pro 所在目录，非 .pri 目录）
+isEmpty(PROJECT_DIR): PROJECT_DIR = $$PWD                     # 兜底：极少数环境无该变量时退回 PWD
+
+PROJECT_FILE = $$_PRO_FILE_                                   # 正在构建的 .pro 完整路径
+isEmpty(PROJECT_FILE) {
+    # 兜底：理论上不应发生；退回“工程目录名.pro”
+    DIR_NAME     = $$basename(PROJECT_DIR)
+    PROJECT_FILE = $$PROJECT_DIR/$${DIR_NAME}.pro
 }
-message(MAIN_PROJECT = $$MAIN_PROJECT)
+
+PRO_BASE     = $$basename(PROJECT_FILE)                       # 例如 SpringLeafTester.pro
+MAIN_PROJECT = $$replace(PRO_BASE, \.pro$|\.PRO$|\.Pro$, "")  # 去扩展名（大小写都兼容）
 
 !isEmpty(MAIN_PROJECT) {
     PROJECT_NAME = $$MAIN_PROJECT
 } else {
-    PROJECT_NAME = $$TARGET
+    # 兜底：实在取不到 .pro 名，就用工程目录名
+    DIR_NAME = $$basename(PROJECT_DIR)
+    PROJECT_NAME = $$DIR_NAME
 }
+message("PROJECT_FILE = $$PROJECT_FILE")
+message("PROJECT_DIR  = $$PROJECT_DIR")
 message("PROJECT_NAME = $$PROJECT_NAME")
+
+isEmpty(PRODUCT_NAME) {
+    PRODUCT_NAME = $$PROJECT_NAME
+}
 
 # ============================================================
 # 六、TARGET 默认命名（工程未显式指定 TARGET 时）
 #   Release: <工程名>   Debug: <工程名>_d
+# 说明：不能再拿 TARGET 反过来当工程名兜底——此处 TARGET 尚未确定，
+# 用它兜底会形成“空赋值空”的死循环，最终 TARGET/DESTDIR 都变空。
 # ============================================================
 isEmpty(TARGET) {
     TARGET = $$PROJECT_NAME
     CONFIG(debug, debug|release): TARGET = $${TARGET}_d
+}
+isEmpty(TARGET) {
+    message(警告: 未能确定工程名，TARGET 为空，请在 .pro 中显式设置 TARGET)
 }
 
 # ============================================================
@@ -290,10 +311,12 @@ android {
 }
 # ============================================================
 # 十二、输出目录（工程上层目录的影子构建产物目录）
+# 用 PROJECT_DIR（.pro 所在目录）而不是 $$PWD：
+# config.pri 被放到共享目录时 $$PWD 会指向共享目录，产物会输出到那里去。
 # ============================================================
 !android {
-    DEST_LIB = $$clean_path($$PWD/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
-    DESTDIR  = $$clean_path($$PWD/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
+    DEST_LIB = $$clean_path($$PROJECT_DIR/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
+    DESTDIR  = $$clean_path($$PROJECT_DIR/../$${PROJECT_NAME}-qt$$[QT_VERSION]-$${DIR_COMPILER}-bin)
 }
 # ============================================================
 # 十三、多语言 qm 输出目录
@@ -359,8 +382,8 @@ win32 {
         #用 RC_FILE 后，QMAKE_TARGET_* / RC_ICONS / VERSION 等变量失效
         isEmpty(VERSION): VERSION = 1.0.0.20261026    # major.minor.patch.build
         isEmpty(QMAKE_TARGET_COMPANY):     QMAKE_TARGET_COMPANY     = "中地装（重庆）地质装备有限公司"
-        isEmpty(QMAKE_TARGET_PRODUCT):     QMAKE_TARGET_PRODUCT     = $$PROJECT_NAME
-        isEmpty(QMAKE_TARGET_DESCRIPTION): QMAKE_TARGET_DESCRIPTION = $$PROJECT_NAME
+        isEmpty(QMAKE_TARGET_PRODUCT):     QMAKE_TARGET_PRODUCT     = $$PRODUCT_NAME
+        isEmpty(QMAKE_TARGET_DESCRIPTION): QMAKE_TARGET_DESCRIPTION = $$PRODUCT_NAME
         isEmpty(QMAKE_TARGET_COPYRIGHT):   QMAKE_TARGET_COPYRIGHT   = "Copyright 2026 中地装（重庆）地质装备有限公司"
 
         RC_LANG      = 0x0804                    # 简体中文；纯英文项目改 0x0409
