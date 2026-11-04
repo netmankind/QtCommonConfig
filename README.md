@@ -29,8 +29,15 @@ include(config.pri)
 - TARGET 默认命名（Release 为工程名、Debug 加 `_d`）
 - GUI 程序自动关闭控制台、使用 Windows 子系统
 - 统一中间目录（moc / rcc / ui / obj）
-- 统一输出目录：`工程名-qt版本-工具链-bin`
+- 统一输出目录：`工程名-qt版本-工具链-bin`（位于**工程目录的上一级**）
 - qm 输出到 exe 同级 `translations/`
+
+### 关于共享使用（把本 config.pri 放共享目录再被各工程 include）
+
+- 工程名取自 `$$_PRO_FILE_`（正在构建的 `.pro`），**不用 `$$PWD`**：
+  在被 include 的 `.pri` 里 `$$PWD` 指向 `.pri` 自身目录，会把工程名/输出目录错算到共享目录上。
+- 输出目录基准是 `$$_PRO_FILE_PWD_`（`.pro` 所在目录），因此无论 config.pri 放在哪，产物都输出到工程目录的上一级。
+- 不再采用"取目录中第一个 `.pro`"的兜底，避免同目录存在多个 `.pro` 时按字母序选错工程。
 
 ### 可选开关（写在 `include(config.pri)` 之前）
 
