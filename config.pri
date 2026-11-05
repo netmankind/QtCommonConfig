@@ -406,15 +406,6 @@ win32 {
 }
 
 # ============================================================
-# 十八、MSVC .exp 导出文件处理
-# .exp 是 MSVC 链接器在存在导出符号（__declspec(dllexport) /
-# DEF_FILE）时产生的中间导出文件，对普通 exe 无用。
-# 链接器没有“禁止生成 .exp”的开关：
-#   1) 首选从源头避免：普通 exe 无导出需求时，去掉 DEF_FILE /
-#      dllexport，MSVC 自然不生成 .exp；
-#   2) 本段兜底：构建结束后自动删除，并纳入 clean 目标。
-# ============================================================
-# ============================================================
 # 十八、MSVC .exp / .lib 导出残留处理
 # .exp 是链接器中间导出文件；.lib 在存在导出符号时生成。
 # 常见成因：工程把“库风格”第三方源码直接编进 exe，却定义了它的
@@ -423,13 +414,19 @@ win32 {
 # 于是 exe 导出一堆无用符号，链接后残留 .exp 与 .lib。
 #   1) 源头：非库工程去掉 *_LIBRARY 等导出宏；但不可简单换成
 #      Q_DECL_IMPORT——库类方法在 .cpp 中定义会触发 MSVC C2491。
-#   2) 本段兜底：/NOEXP 禁止生成 .exp，其余残留构建后自动删除，
-#      并纳入 clean 目标。.lib 仅对“非库工程”删除：
-#      DLL/静态库工程的 .lib 是导入库/库本体，必须保留。
+#   2) 本段兜底：/NOEXP、/NOIMPLIB 从源头禁止生成；
+#      删除命令保留，用于清理历史残留并纳入 clean 目标。
+#      .lib 仅对“非库工程”处理——DLL/静态库工程的 .lib
+#      是导入库/库本体，必须保留（不加 /NOIMPLIB、不删）。
 # ============================================================
 win32-msvc* {
-    # 不生成exp文件（链接器开关）
+    # 链接器开关：/NOEXP 禁 .exp（任何工程都无用）；
+    # /NOIMPLIB 禁导入库 .lib（实测：带 dllexport 的 DLL 加
+    # /NOIMPLIB /NOEXP 后只生成 .dll，无 .lib/.exp）。
+    # 仅非库工程加 /NOIMPLIB——DLL/静态库的 .lib 是导入库/库本体，
+    # 加了这个选项依赖方将无法链接。
     QMAKE_LFLAGS += /NOEXP
+    !contains(TEMPLATE, lib): QMAKE_LFLAGS += /NOIMPLIB
     QMAKE_CLEAN += $$shell_path($$OUT_PWD)\*.exp
     !isEmpty(DESTDIR): QMAKE_CLEAN += $$shell_path($$DESTDIR)\*.exp
     QMAKE_POST_LINK += $$QMAKE_DEL_FILE /q /f $$shell_quote($$shell_path($$OUT_PWD)\*.exp) $$shell_quote($$shell_path($$DESTDIR)\*.exp) || exit 0 $$escape_expand(\\n\\t)
