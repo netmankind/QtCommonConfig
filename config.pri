@@ -87,14 +87,14 @@ win32-msvc* {
     }
 }
 # ---------- MinGW / GCC / Clang ----------
-win32-g++|gcc|clang {
+win32-g++ | gcc | clang {
     # 统一源码字符集为 UTF-8
     QMAKE_CXXFLAGS *= -finput-charset=UTF-8 -fexec-charset=UTF-8
 }
 # -fexec-charset是 GCC 专属 flag（clang 直到很新的版本才支持）
 # 如果clang版本较旧，改为下面的，gcc scope 覆盖 MinGW/所有 GCC；clang 不再被带进来
 #gcc {
-#    QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
+#    QMAKE_CXXFLAGS *= -finput-charset=UTF-8 -fexec-charset=UTF-8
 #}
 
 
@@ -104,7 +104,7 @@ win32-g++|gcc|clang {
         QMAKE_CXXFLAGS *= /W3
         CONFIG(strict_warnings): QMAKE_CXXFLAGS *= /W4
     }
-    win32-g++|gcc|clang {
+    win32-g++ | gcc | clang {
         QMAKE_CXXFLAGS *= -Wall
         CONFIG(strict_warnings): QMAKE_CXXFLAGS *= -Wextra
     }
@@ -188,11 +188,11 @@ isEmpty(TARGET) {
 # ============================================================
 # 七、操作系统位数与编译器标识
 # ============================================================
-contains(QT_ARCH, x86_64)|contains(QT_ARCH, arm64)|contains(QT_ARCH, aarch64)|\
-contains(QT_ARCH, riscv64)|contains(QT_ARCH, mips64)|contains(QT_ARCH, arm64-v8a) {
+contains(QT_ARCH, x86_64) | contains(QT_ARCH, arm64) | contains(QT_ARCH, aarch64) | \
+contains(QT_ARCH, riscv64) | contains(QT_ARCH, mips64) | contains(QT_ARCH, arm64-v8a) {
     BITS = 64
-} else: contains(QT_ARCH, i.86)|contains(QT_ARCH, x86)|contains(QT_ARCH, arm)|\
-        contains(QT_ARCH, mips)|contains(QT_ARCH, riscv32)|contains(QT_ARCH, armeabi-v7a) {
+} else: contains(QT_ARCH, i.86) | contains(QT_ARCH, x86) | contains(QT_ARCH, arm) | \
+        contains(QT_ARCH, mips) | contains(QT_ARCH, riscv32) | contains(QT_ARCH, armeabi-v7a) {
     BITS = 32
 } else {
     BITS =
@@ -231,7 +231,7 @@ win32 {
     }
 }
 # ---------- x86 Linux ----------
-linux-g++|linux-clang {
+linux-g++ | linux-clang {
     contains(QT_ARCH, x86_64) {
         DIR_PLATFORM = Linux-x86_64
     } else {
@@ -241,7 +241,7 @@ linux-g++|linux-clang {
     TOOLCHAIN_TAG = gcc
 }
 # ---------- ARM Linux ----------
-my-linux-arm-qt|linux-arm-gnueabi-g++ {
+my-linux-arm-qt | linux-arm-gnueabi-g++ {
     DIR_PLATFORM = Linux-arm
     DEFINES *= BUILD_FOR_ARM
     target.path = /home/root
