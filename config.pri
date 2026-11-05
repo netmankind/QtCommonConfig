@@ -80,10 +80,6 @@ win32-msvc* {
     # 链接侧 /DEBUG 输出 PDB；注意开启 /DEBUG 后链接器默认变回 /OPT:NOREF /OPT:NOICF，要显式补回裁剪选项
     QMAKE_CXXFLAGS_RELEASE += /Zi
     QMAKE_LFLAGS_RELEASE   += /DEBUG /OPT:REF /OPT:ICF
-    # 不生成exp文件
-    win32-msvc* {
-        QMAKE_LFLAGS += /NOEXP
-    }
     # 静态链接CRT默认动态链接（/MD、/MDd），CRT指C/C++运行时库（`vcruntime140.dll`、`msvcp140.dll` 等）
     CONFIG(static_runtime) {
         QMAKE_CXXFLAGS_DEBUG   += /MTd
@@ -418,8 +414,30 @@ win32 {
 #      dllexport，MSVC 自然不生成 .exp；
 #   2) 本段兜底：构建结束后自动删除，并纳入 clean 目标。
 # ============================================================
+# ============================================================
+# 十八、MSVC .exp / .lib 导出残留处理
+# .exp 是链接器中间导出文件；.lib 在存在导出符号时生成。
+# 常见成因：工程把“库风格”第三方源码直接编进 exe，却定义了它的
+# *_LIBRARY 导出宏（本工程 FluentUIStyle.pri 的
+# FLUENTUI3STYLE_LIBRARY / EXWIDGETS_LIBRARY → Q_DECL_EXPORT），
+# 于是 exe 导出一堆无用符号，链接后残留 .exp 与 .lib。
+#   1) 源头：非库工程去掉 *_LIBRARY 等导出宏；但不可简单换成
+#      Q_DECL_IMPORT——库类方法在 .cpp 中定义会触发 MSVC C2491。
+#   2) 本段兜底：/NOEXP 禁止生成 .exp，其余残留构建后自动删除，
+#      并纳入 clean 目标。.lib 仅对“非库工程”删除：
+#      DLL/静态库工程的 .lib 是导入库/库本体，必须保留。
+# ============================================================
 win32-msvc* {
+    # 不生成exp文件（链接器开关）
+    QMAKE_LFLAGS += /NOEXP
     QMAKE_CLEAN += $$shell_path($$OUT_PWD)\*.exp
     !isEmpty(DESTDIR): QMAKE_CLEAN += $$shell_path($$DESTDIR)\*.exp
     QMAKE_POST_LINK += $$QMAKE_DEL_FILE /q /f $$shell_quote($$shell_path($$OUT_PWD)\*.exp) $$shell_quote($$shell_path($$DESTDIR)\*.exp) || exit 0 $$escape_expand(\\n\\t)
+
+    # .lib：仅非库工程（TEMPLATE != lib）删除；库工程的导入库必须保留
+    !contains(TEMPLATE, lib) {
+        QMAKE_CLEAN += $$shell_path($$OUT_PWD)\*.lib
+        !isEmpty(DESTDIR): QMAKE_CLEAN += $$shell_path($$DESTDIR)\*.lib
+        QMAKE_POST_LINK += $$QMAKE_DEL_FILE /q /f $$shell_quote($$shell_path($$OUT_PWD)\*.lib) $$shell_quote($$shell_path($$DESTDIR)\*.lib) || exit 0 $$escape_expand(\\n\\t)
+    }
 }
