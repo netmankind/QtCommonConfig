@@ -69,27 +69,27 @@ CONFIG(strict_qt) {
 # ---------- MSVC ----------
 win32-msvc* {
     # 源文件 / 执行字符集统一 UTF-8（否则中文在源码中易乱码）
-    QMAKE_CXXFLAGS += /utf-8
+    QMAKE_CXXFLAGS *= /utf-8
     # /MP：多进程并行编译，显著提升多文件工程编译速度
-    QMAKE_CXXFLAGS += /MP
+    QMAKE_CXXFLAGS *= /MP
     #让 MSVC 正确报告 __cplusplus 宏（否则永远报 199711L，影响大量现代库的版本探测）
-    QMAKE_CXXFLAGS += /Zc:__cplusplus
+    QMAKE_CXXFLAGS *= /Zc:__cplusplus
     # /permissive-：严格标准合规；老第三方头文件若报警可去掉这一行
-    QMAKE_CXXFLAGS += /permissive-
+    QMAKE_CXXFLAGS *= /permissive-
     # MSVC Release 默认不带符号，崩溃 dump 无法符号化。/Zi 生成独立 PDB 且不影响优化
     # 链接侧 /DEBUG 输出 PDB；注意开启 /DEBUG 后链接器默认变回 /OPT:NOREF /OPT:NOICF，要显式补回裁剪选项
-    QMAKE_CXXFLAGS_RELEASE += /Zi
-    QMAKE_LFLAGS_RELEASE   += /DEBUG /OPT:REF /OPT:ICF
+    QMAKE_CXXFLAGS_RELEASE *= /Zi
+    QMAKE_LFLAGS_RELEASE   *= /DEBUG /OPT:REF /OPT:ICF
     # 静态链接CRT默认动态链接（/MD、/MDd），CRT指C/C++运行时库（`vcruntime140.dll`、`msvcp140.dll` 等）
     CONFIG(static_runtime) {
-        QMAKE_CXXFLAGS_DEBUG   += /MTd
-        QMAKE_CXXFLAGS_RELEASE += /MT
+        QMAKE_CXXFLAGS_DEBUG   *= /MTd
+        QMAKE_CXXFLAGS_RELEASE *= /MT
     }
 }
 # ---------- MinGW / GCC / Clang ----------
 win32-g++|gcc|clang {
     # 统一源码字符集为 UTF-8
-    QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
+    QMAKE_CXXFLAGS *= -finput-charset=UTF-8 -fexec-charset=UTF-8
 }
 # -fexec-charset是 GCC 专属 flag（clang 直到很新的版本才支持）
 # 如果clang版本较旧，改为下面的，gcc scope 覆盖 MinGW/所有 GCC；clang 不再被带进来
@@ -101,12 +101,12 @@ win32-g++|gcc|clang {
 # ---------- 警告级别 ----------
 !CONFIG(no_warnings) {
     win32-msvc* {
-        QMAKE_CXXFLAGS += /W3
-        CONFIG(strict_warnings): QMAKE_CXXFLAGS += /W4
+        QMAKE_CXXFLAGS *= /W3
+        CONFIG(strict_warnings): QMAKE_CXXFLAGS *= /W4
     }
     win32-g++|gcc|clang {
-        QMAKE_CXXFLAGS += -Wall
-        CONFIG(strict_warnings): QMAKE_CXXFLAGS += -Wextra
+        QMAKE_CXXFLAGS *= -Wall
+        CONFIG(strict_warnings): QMAKE_CXXFLAGS *= -Wextra
     }
 }
 
@@ -117,12 +117,12 @@ win32-g++|gcc|clang {
 # 而 Qt5 qmake 会自动加。这里仅对 Qt6 + MSVC 补齐，避免 LNK2019
 # （SetWindowPos、GetWindowLongPtrW 等均位于 user32）
 win32-msvc*:greaterThan(QT_MAJOR_VERSION, 5) {
-    LIBS += gdi32.lib comdlg32.lib oleaut32.lib imm32.lib winmm.lib \
+    LIBS *= gdi32.lib comdlg32.lib oleaut32.lib imm32.lib winmm.lib \
             ws2_32.lib ole32.lib uuid.lib user32.lib advapi32.lib
 }
 #MinGW 构建的 exe 默认依赖 libgcc_s_seh-1.dll、libstdc++-6.dll，windeployqt 会多拷两个 DLL；链接期直接静态进来更省事
 win32-g++ {
-    QMAKE_LFLAGS += -static-libgcc -static-libstdc++
+    QMAKE_LFLAGS *= -static-libgcc -static-libstdc++
 }
 
 # ============================================================
@@ -243,9 +243,9 @@ linux-g++|linux-clang {
 # ---------- ARM Linux ----------
 my-linux-arm-qt|linux-arm-gnueabi-g++ {
     DIR_PLATFORM = Linux-arm
-    DEFINES += BUILD_FOR_ARM
+    DEFINES *= BUILD_FOR_ARM
     target.path = /home/root
-    INSTALLS += target
+    INSTALLS *= target
     # 构建步骤里用 DEFINES += AM437X / A5D3 区分板卡
     contains(DEFINES, AM437X): DIR_COMPILER = AM437X
     contains(DEFINES, A5D3):   DIR_COMPILER = A5D3
@@ -297,11 +297,11 @@ CONFIG(debug, debug|release) {
 equals(TEMPLATE, app) {
     CONFIG(console_app) {
         # 控制台程序：保留控制台输出
-        win32: CONFIG += console
+        win32: CONFIG *= console
     } else {
         # GUI 程序：关闭控制台黑窗，使用 Windows 子系统
         CONFIG -= console
-        win32: CONFIG += windows
+        win32: CONFIG *= windows
     }
 }
 
@@ -381,8 +381,8 @@ else: GIT_SILENT = 2>/dev/null           # 灭掉 fatal / "git 不是内部或�
 GIT_HASH = $$system(git -C $$system_path($$GIT_REPO_DIR) rev-parse --short HEAD $$GIT_SILENT)
 isEmpty(GIT_HASH): GIT_HASH = dev         # 非 git 工程 / git 不在 PATH → 统一回退值
 
-DEFINES    += APP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # C++ 里：QString hash = APP_BUILD_GIT;
-QMAKE_RCFLAGS += /DAPP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # 顺带传给 rc.exe
+DEFINES    *= APP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # C++ 里：QString hash = APP_BUILD_GIT;
+QMAKE_RCFLAGS *= /DAPP_BUILD_GIT=\\\"$$GIT_HASH\\\"   # 顺带传给 rc.exe
 
 # ============================================================
 # 十七、Windows 版本信息与图标（qmake 自动生成 .rc 并链接）
@@ -425,8 +425,8 @@ win32-msvc* {
     # /NOIMPLIB /NOEXP 后只生成 .dll，无 .lib/.exp）。
     # 仅非库工程加 /NOIMPLIB——DLL/静态库的 .lib 是导入库/库本体，
     # 加了这个选项依赖方将无法链接。
-    QMAKE_LFLAGS += /NOEXP
-    !contains(TEMPLATE, lib): QMAKE_LFLAGS += /NOIMPLIB
+    QMAKE_LFLAGS *= /NOEXP
+    !contains(TEMPLATE, lib): QMAKE_LFLAGS *= /NOIMPLIB
     QMAKE_CLEAN += $$shell_path($$OUT_PWD)\*.exp
     !isEmpty(DESTDIR): QMAKE_CLEAN += $$shell_path($$DESTDIR)\*.exp
     QMAKE_POST_LINK += $$QMAKE_DEL_FILE /q /f $$shell_quote($$shell_path($$OUT_PWD)\*.exp) $$shell_quote($$shell_path($$DESTDIR)\*.exp) || exit 0 $$escape_expand(\\n\\t)
