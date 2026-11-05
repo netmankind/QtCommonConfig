@@ -80,6 +80,10 @@ win32-msvc* {
     # 链接侧 /DEBUG 输出 PDB；注意开启 /DEBUG 后链接器默认变回 /OPT:NOREF /OPT:NOICF，要显式补回裁剪选项
     QMAKE_CXXFLAGS_RELEASE += /Zi
     QMAKE_LFLAGS_RELEASE   += /DEBUG /OPT:REF /OPT:ICF
+    # 不生成exp文件
+    win32-msvc* {
+        QMAKE_LFLAGS += /NOEXP
+    }
     # 静态链接CRT默认动态链接（/MD、/MDd），CRT指C/C++运行时库（`vcruntime140.dll`、`msvcp140.dll` 等）
     CONFIG(static_runtime) {
         QMAKE_CXXFLAGS_DEBUG   += /MTd
@@ -403,4 +407,19 @@ win32 {
     }
 } else {
     VERSION = 1.0.0    # major.minor.patch
+}
+
+# ============================================================
+# 十八、MSVC .exp 导出文件处理
+# .exp 是 MSVC 链接器在存在导出符号（__declspec(dllexport) /
+# DEF_FILE）时产生的中间导出文件，对普通 exe 无用。
+# 链接器没有“禁止生成 .exp”的开关：
+#   1) 首选从源头避免：普通 exe 无导出需求时，去掉 DEF_FILE /
+#      dllexport，MSVC 自然不生成 .exp；
+#   2) 本段兜底：构建结束后自动删除，并纳入 clean 目标。
+# ============================================================
+win32-msvc* {
+    QMAKE_CLEAN += $$shell_path($$OUT_PWD)\*.exp
+    !isEmpty(DESTDIR): QMAKE_CLEAN += $$shell_path($$DESTDIR)\*.exp
+    QMAKE_POST_LINK += $$QMAKE_DEL_FILE /q /f $$shell_quote($$shell_path($$OUT_PWD)\*.exp) $$shell_quote($$shell_path($$DESTDIR)\*.exp) || exit 0 $$escape_expand(\\n\\t)
 }
