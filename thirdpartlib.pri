@@ -4,11 +4,11 @@
 #
 # 用法（主 .pro，通常在 include(config.pri) 之后）：
 #   include(QtCommonConfig/thirdpartlib.pri)
+# 不需要第三方库时，直接不 include 本文件即可。
 #
 # 可选开关（写在 include 之前）：
 #   CONFIG += static_thirdparty      # 静态链接第三方库（默认动态 shared）
 #   CONFIG += no_thirdparty_deploy   # 动态库不自动复制 dll（默认构建后拷到 DESTDIR）
-#   CONFIG += skip_thirdparty        # 整体跳过：不链接、不复制
 #
 # 可选变量（覆盖默认值）：
 #   THIRDPART_ROOT   = E:/open_source/openssl-curl-ssh2/build  # 预编译库根目录
@@ -20,11 +20,6 @@
 #   <根目录>/<工具链目录>/<组件>-<版本>-openssl-<版本>-<shared|static>
 #   例：build/mingw64-qt6/curl-8.23.0-openssl-3.5.9-shared
 # ============================================================
-
-# ---------- 0. 整体跳过 ----------
-CONFIG(skip_thirdparty) {
-    message("thirdpartlib: 已通过 skip_thirdparty 跳过")
-} else {
 
 # ---------- 1. 版本与链接方式 ----------
 isEmpty(OPENSSL_VERSION):  OPENSSL_VERSION  = 3.5.9
@@ -70,7 +65,7 @@ win32:!android {
     # 存在性提示：头文件缺失时给出明确警告，避免静默链接失败
     !exists($$SSL_PATH/include/openssl/ssl.h): message("警告: 未找到 OpenSSL 头文件 $$SSL_PATH")
     !exists($$SSH2_PATH/include/libssh2.h):   message("警告: 未找到 libssh2 头文件 $$SSH2_PATH")
-    !exists($$CURL_PATH/include/curl/curl.h):  message("警告: 未找到 libcurl 头文件 $$CURL_PATH")
+    !exists($$CURL_PATH/include/curl/curl.h): message("警告: 未找到 libcurl 头文件 $$CURL_PATH")
 
     win32-g++ {
         LIBS *= -L$$SSL_PATH/lib  -lssl -lcrypto
@@ -132,5 +127,3 @@ win32:!android:!CONFIG(static_thirdparty):!CONFIG(no_thirdparty_deploy) {
                            $$shell_quote($$shell_path($$DESTDIR)) $$escape_expand(\\n\\t)
     }
 }
-
-} # CONFIG(skip_thirdparty) 结束

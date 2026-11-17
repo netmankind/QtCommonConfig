@@ -73,7 +73,8 @@ include(QtCommonConfig/thirdpartlib.pri)
 |---|---|
 | `CONFIG += static_thirdparty` | 静态链接第三方库（目录后缀 `static`，加 `CURL_STATICLIB` / `LIBSSH2_STATICLIB` 与 Windows 系统库） |
 | `CONFIG += no_thirdparty_deploy` | 动态库不自动复制 dll（默认构建后把 `bin/*.dll` 拷到 `DESTDIR`） |
-| `CONFIG += skip_thirdparty` | 整体跳过：不链接、不复制 |
+
+不需要第三方库时，直接不 include 本文件即可。
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
