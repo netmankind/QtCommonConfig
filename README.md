@@ -7,6 +7,7 @@ Qt 工程通用配置集合，适用于 Qt 5.15 / Qt 6.x，Windows / Linux / mac
 | 文件 | 说明 |
 |---|---|
 | `config.pri` | qmake 通用工程配置 |
+| `thirdpartlib.pri` | OpenSSL / libssh2 / libcurl 第三方预编译库通用配置 |
 
 ## 使用方法
 
@@ -57,6 +58,34 @@ include(config.pri)
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `VERSION_FILE_BASENAME` | `version` | 版本文件名（不含扩展名），配合 `version_stamp` 使用 |
+
+### thirdpartlib.pri（第三方预编译库）
+
+在 `include(config.pri)` 之后引入：
+
+```qmake
+include(QtCommonConfig/thirdpartlib.pri)
+```
+
+按工具链自动选择预编译目录（MinGW Qt6 / Qt5、MSVC x64、Android ABI），路径统一 `clean_path` 归一化；默认动态链接（shared），可切换静态。
+
+| 开关（写在 include 之前） | 作用 |
+|---|---|
+| `CONFIG += static_thirdparty` | 静态链接第三方库（目录后缀 `static`，加 `CURL_STATICLIB` / `LIBSSH2_STATICLIB` 与 Windows 系统库） |
+| `CONFIG += no_thirdparty_deploy` | 动态库不自动复制 dll（默认构建后把 `bin/*.dll` 拷到 `DESTDIR`） |
+| `CONFIG += skip_thirdparty` | 整体跳过：不链接、不复制 |
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `THIRDPART_ROOT` | `E:/open_source/openssl-curl-ssh2/build` | 预编译库根目录 |
+| `OPENSSL_VERSION` | `3.5.9` | OpenSSL 版本（目录名片段） |
+| `LIBSSH2_VERSION` | `1.11.1` | libssh2 版本 |
+| `LIBCURL_VERSION` | `8.23.0` | libcurl 版本 |
+
+- Windows：按工具链加头文件路径与链接库；MSVC curl 动态为 `libcurl_imp.lib`、静态为 `libcurl.lib`。
+- Linux：直接链系统库（`-lssl -lcrypto -lssh2 -lcurl`），无需预编译路径。
+- Android：动态库进 `ANDROID_EXTRA_LIBS`；静态包无 `.so`，自动跳过。
+- 头文件缺失时 `message` 给出明确警告，避免静默链接失败。
 
 ## 提交者
 
