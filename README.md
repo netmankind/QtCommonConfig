@@ -7,6 +7,7 @@ Qt 工程通用配置集合，适用于 Qt 5.15 / Qt 6.x，Windows / Linux / mac
 | 文件 | 说明 |
 |---|---|
 | `config.pri` | qmake 通用工程配置 |
+| `config.cmake` | CMake 通用工程配置（与 `config.pri` 对应） |
 | `thirdpartlib.pri` | OpenSSL / libssh2 / libcurl 第三方预编译库通用配置 |
 
 ## 使用方法
@@ -19,6 +20,21 @@ Qt 工程通用配置集合，适用于 Qt 5.15 / Qt 6.x，Windows / Linux / mac
 ```qmake
 include(config.pri)
 ```
+
+### config.cmake
+
+1. 将 `config.cmake` 放到工程的 `QtCommonConfig/` 目录（或随 submodule 引入）；
+2. 在主 `CMakeLists.txt` 中引入，并在目标创建后调用通用函数：
+
+```cmake
+include(${CMAKE_CURRENT_SOURCE_DIR}/QtCommonConfig/config.cmake)
+
+add_executable(foo ...)
+qt_common_configure_target(foo)     # 通用宏 / 编译器选项 / 系统库补全
+qt_common_set_output_dir(foo)       # 影子构建输出目录（可选）
+```
+
+可选开关变量（include 之前设置）：`QT_COMMON_KEEP_DEPRECATED`、`QT_COMMON_STRICT_WARNINGS`、`QT_COMMON_NO_WARNINGS`、`QT_COMMON_STATIC_RUNTIME`，含义与 `config.pri` 的同名 CONFIG 开关一致。
 
 ### 默认开启
 
