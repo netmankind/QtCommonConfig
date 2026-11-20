@@ -9,6 +9,7 @@ Qt 工程通用配置集合，适用于 Qt 5.15 / Qt 6.x，Windows / Linux / mac
 | `config.pri` | qmake 通用工程配置 |
 | `config.cmake` | CMake 通用工程配置（与 `config.pri` 对应） |
 | `thirdpartlib.pri` | OpenSSL / libssh2 / libcurl 第三方预编译库通用配置 |
+| `thirdpartlib.cmake` | 第三方预编译库 CMake 配置（与 `thirdpartlib.pri` 对应） |
 
 ## 使用方法
 
@@ -75,22 +76,29 @@ qt_common_set_output_dir(foo)       # 影子构建输出目录（可选）
 |---|---|---|
 | `VERSION_FILE_BASENAME` | `version` | 版本文件名（不含扩展名），配合 `version_stamp` 使用 |
 
-### thirdpartlib.pri（第三方预编译库）
+### thirdpartlib.pri / thirdpartlib.cmake（第三方预编译库）
 
-在 `include(config.pri)` 之后引入：
+qmake：在 `include(config.pri)` 之后引入：
 
 ```qmake
 include(QtCommonConfig/thirdpartlib.pri)
 ```
 
-按工具链自动选择预编译目录（MinGW Qt6 / Qt5、MSVC x64、Android ABI），路径统一 `clean_path` 归一化；默认动态链接（shared），可切换静态。
+CMake：引入后在目标创建后调用链接函数：
 
-| 开关（写在 include 之前） | 作用 |
-|---|---|
-| `CONFIG += static_thirdparty` | 静态链接第三方库（目录后缀 `static`，加 `CURL_STATICLIB` / `LIBSSH2_STATICLIB` 与 Windows 系统库） |
-| `CONFIG += no_thirdparty_deploy` | 动态库不自动复制 dll（默认构建后把 `bin/*.dll` 拷到 `DESTDIR`） |
+```cmake
+include(${CMAKE_CURRENT_SOURCE_DIR}/QtCommonConfig/thirdpartlib.cmake)
+qt_common_link_thirdparty(foo)
+```
 
-不需要第三方库时，直接不 include 本文件即可。
+按工具链自动选择预编译目录（MinGW Qt6 / Qt5、MSVC x64、Android ABI），路径统一归一化；默认动态链接（shared），可切换静态。
+
+| qmake 开关 | CMake 变量 | 作用 |
+|---|---|---|
+| `CONFIG += static_thirdparty` | `QT_COMMON_STATIC_THIRDPARTY` | 静态链接第三方库（目录后缀 `static`，加 `CURL_STATICLIB` / `LIBSSH2_STATICLIB` 与 Windows 系统库） |
+| `CONFIG += no_thirdparty_deploy` | `QT_COMMON_NO_THIRDPARTY_DEPLOY` | 动态库不自动复制 dll（默认构建后把 `bin/*.dll` 拷到输出目录） |
+
+不需要第三方库时，qmake 不 include、CMake 不调用函数即可。
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
