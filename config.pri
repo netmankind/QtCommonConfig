@@ -361,10 +361,13 @@ win32:CONFIG(auto_deploy) {
 CONFIG(version_stamp) {
     isEmpty(VERSION_FILE_BASENAME): VERSION_FILE_BASENAME = version
     VERSION_OBJ = $$OBJECTS_DIR/$${VERSION_FILE_BASENAME}.*
-    win32 {
+    win32-msvc* {
+        # del /q /f 静默强制删除；路径反斜杠由 cmd 展开通配符
         QMAKE_POST_LINK += $$QMAKE_DEL_FILE /q /f $$shell_quote($$system_path($$VERSION_OBJ)) || exit 0 $$escape_expand(\\n\\t)
     } else {
-        QMAKE_POST_LINK += $$QMAKE_DEL_FILE $$system_path($$VERSION_OBJ) || exit 0 $$escape_expand(\\n\\t)
+        # rm -f：QMAKE_DEL_FILE 已含 -f，不再追加 Windows 的 /q /f；
+        # 正斜杠路径交给 shell 展开 version.* 通配符
+        QMAKE_POST_LINK += $$QMAKE_DEL_FILE $$shell_path($$VERSION_OBJ) || exit 0 $$escape_expand(\\n\\t)
     }
 }
 
