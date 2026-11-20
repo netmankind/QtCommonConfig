@@ -5,14 +5,19 @@
 # 用法（主 CMakeLists.txt，project() 与 add_executable/add_library 之后）：
 #   include(${CMAKE_CURRENT_SOURCE_DIR}/QtCommonConfig/config.cmake)
 #   add_executable(foo ...)
-#   qt_common_configure_target(foo)        # 通用宏 / 编译器选项 / 系统库补全
+#   qt_common_configure_target(foo)        # 通用宏 / 标准 / 编译器选项 / 子系统 / 系统库补全
 #   qt_common_set_output_dir(foo)          # 影子构建输出目录（可选）
+#   qt_common_refresh_version_on_build(foo) # 每次构建刷新版本时间（可选）
+#   qt_common_deploy_windows(foo)           # Windows 构建后 windeployqt（可选）
+#   qt_common_print_build_info()            # 打印平台 / 编译器 / Qt 版本信息（可选）
 #
 # 可选开关变量（include 之前设置，对应 pri 的 CONFIG 开关）：
-#   QT_COMMON_KEEP_DEPRECATED   不禁用 Qt 5.15 之前的废弃 API（默认禁用）
-#   QT_COMMON_STRICT_WARNINGS   严格警告（MSVC /W4，GCC/Clang 额外 -Wextra）
-#   QT_COMMON_NO_WARNINGS        不主动追加警告级别
-#   QT_COMMON_STATIC_RUNTIME    MSVC 静态链接 CRT（/MT、/MTd；Qt 官方 DLL 下保持默认 /MD）
+#   QT_COMMON_KEEP_DEPRECATED    不禁用 Qt 5.15 之前的废弃 API（默认禁用）
+#   QT_COMMON_STRICT_WARNINGS    严格警告（MSVC /W4，GCC/Clang 额外 -Wextra）
+#   QT_COMMON_NO_WARNINGS         不主动追加警告级别
+#   QT_COMMON_STATIC_RUNTIME     MSVC 静态链接 CRT（/MT、/MTd；Qt 官方 DLL 下保持默认 /MD）
+#   QT_COMMON_CONSOLE_APP         控制台程序（默认 GUI 程序，Windows 下不挂控制台子系统）
+#   QT_COMMON_STRICT_QT            严格迭代器（QT_STRICT_ITERATORS，默认关闭）
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -22,12 +27,27 @@
 # -----------------------------------------------------------------------------
 function(qt_common_configure_target target)
 
+    # ---- C++ 标准（对应 pri CONFIG += c++17；cxx_std_17 默认关闭编译器扩展） ----
+    target_compile_features(${target} PRIVATE cxx_std_17)
+
+    # ---- 应用类型（对应 pri 第十节）：默认 GUI 挂 Windows 子系统；控制台程序保留控制台 ----
+    if(QT_COMMON_CONSOLE_APP)
+        set_target_properties(${target} PROPERTIES WIN32_EXECUTABLE FALSE)
+    else()
+        set_target_properties(${target} PROPERTIES WIN32_EXECUTABLE TRUE)
+    endif()
+
     # ---- 通用编译定义（与 config.pri 第一节 DEFINES 对齐） ----
     target_compile_definitions(${target} PRIVATE
         QT_MESSAGELOGCONTEXT      # Release 下保留日志上下文（文件名 / 函数 / 行号）
         QT_DEPRECATED_WARNINGS    # 使用废弃 API 时发出警告
         QT_USE_QSTRINGBUILDER     # QString 拼接走 QStringBuilder 优化
     )
+
+    # 严格迭代器：const/可变迭代器混用直接报错（对应 pri strict_qt 开关）
+    if(QT_COMMON_STRICT_QT)
+        target_compile_definitions(${target} PRIVATE QT_STRICT_ITERATORS)
+    endif()
 
     # 默认禁用 Qt 5.15 之前的废弃 API；需要保留时在 include 前置 QT_COMMON_KEEP_DEPRECATED
     if(NOT QT_COMMON_KEEP_DEPRECATED)
@@ -144,6 +164,12 @@ function(qt_common_set_output_dir target)
         )
     endforeach()
 
+    # 输出名（对应 pri 第六节）：Release 系列用工程名，Debug 追加 _d 后缀
+    set_target_properties(${target} PROPERTIES
+        OUTPUT_NAME ${PROJECT_NAME}
+        OUTPUT_NAME_DEBUG ${PROJECT_NAME}_d
+    )
+
 endfunction()
 
 # -----------------------------------------------------------------------------
@@ -195,5 +221,51 @@ function(qt_common_refresh_version_on_build target)
         COMMENT "Touching ${version_source} to refresh build time"
     )
     add_dependencies(${target} ${target}_refresh_version)
+
+endfunction()
+
+# -----------------------------------------------------------------------------
+# 打印构建环境信息（对应 config.pri 第四节）：操作系统 / 架构 / 编译器 / Qt 版本。
+# 无参数，configure 阶段输出到日志，便于核对工具链。
+# -----------------------------------------------------------------------------
+function(qt_common_print_build_info)
+
+    message(STATUS "[QtCommonConfig] Qt ${QT_VERSION} (major ${QT_VERSION_MAJOR})")
+    message(STATUS "[QtCommonConfig] Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+    message(STATUS "[QtCommonConfig] System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR} "
+        "(${CMAKE_SIZEOF_VOID_P}-bit, ${CMAKE_HOST_NUMBER_OF_PROCESSORS} cores)")
+
+endfunction()
+
+# -----------------------------------------------------------------------------
+# Windows 构建后自动调用 windeployqt 收集 Qt 运行时依赖（对应 config.pri 第十四节
+# auto_deploy）；非 Windows 直接返回。--no-translations 跳过 qm，翻译由工程自行拷贝。
+# 参数：
+#   target —— 主可执行目标名
+# -----------------------------------------------------------------------------
+function(qt_common_deploy_windows target)
+
+    if(NOT WIN32)
+        return()
+    endif()
+
+    # 优先在当前 Qt 安装目录下查找 windeployqt6 / windeployqt
+    find_program(WINDEPLOYQT_EXECUTABLE
+        NAMES windeployqt6 windeployqt
+        HINTS "${Qt${QT_VERSION_MAJOR}Core_DIR}/../../../bin"
+        NO_DEFAULT_PATH
+    )
+    if(NOT WINDEPLOYQT_EXECUTABLE)
+        find_program(WINDEPLOYQT_EXECUTABLE NAMES windeployqt6 windeployqt)
+    endif()
+
+    if(WINDEPLOYQT_EXECUTABLE)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND "${WINDEPLOYQT_EXECUTABLE}"
+                --no-translations
+                "$<TARGET_FILE:${target}>"
+            COMMENT "Running windeployqt for ${target}"
+        )
+    endif()
 
 endfunction()

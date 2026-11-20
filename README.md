@@ -29,14 +29,37 @@ include(config.pri)
 
 ```cmake
 include(${CMAKE_CURRENT_SOURCE_DIR}/QtCommonConfig/config.cmake)
+qt_common_print_build_info()                        # 打印平台 / 编译器 / Qt 版本信息（可选）
 
 add_executable(foo ...)
-qt_common_configure_target(foo)                    # 通用宏 / 编译器选项 / 系统库补全
+qt_common_configure_target(foo)                    # C++17、通用宏 / 编译器选项 / 子系统 / 系统库补全
 qt_common_set_output_dir(foo)                      # 影子构建输出目录（可选）
 qt_common_refresh_version_on_build(foo)            # 每次构建刷新版本时间（对应 version_stamp，可选）
+qt_common_deploy_windows(foo)                      # Windows 构建后 windeployqt（对应 auto_deploy，可选）
 ```
 
-可选开关变量（include 之前设置）：`QT_COMMON_KEEP_DEPRECATED`、`QT_COMMON_STRICT_WARNINGS`、`QT_COMMON_NO_WARNINGS`、`QT_COMMON_STATIC_RUNTIME`，含义与 `config.pri` 的同名 CONFIG 开关一致。
+可选开关变量（include 之前设置）：
+
+| qmake 开关 | CMake 变量 | 作用 |
+|---|---|---|
+| `CONFIG += keep_deprecated` | `QT_COMMON_KEEP_DEPRECATED` | 不禁用 Qt 5.15 之前的废弃 API（默认禁用） |
+| `CONFIG += strict_warnings` | `QT_COMMON_STRICT_WARNINGS` | 更严格警告（MSVC `/W4`，GCC/Clang 额外 `-Wextra`） |
+| `CONFIG += no_warnings` | `QT_COMMON_NO_WARNINGS` | 不主动追加警告选项 |
+| `CONFIG += static_runtime` | `QT_COMMON_STATIC_RUNTIME` | MSVC 静态链接 CRT（`/MT`、`/MTd`；Qt 官方 DLL 下不建议） |
+| `CONFIG += console_app` | `QT_COMMON_CONSOLE_APP` | 控制台程序（默认 GUI 程序，Windows 下不挂控制台子系统） |
+| `CONFIG += strict_qt` | `QT_COMMON_STRICT_QT` | 严格迭代器（`QT_STRICT_ITERATORS`，默认关闭） |
+
+### CMake 侧未重复实现的项（机制等价或工程专属）
+
+| config.pri 项 | 不在 cmake 侧重复的原因 |
+|---|---|
+| `resources_big` / `gif`、`debug_and_release` | 属 qmake 资源与单/多配置构建选项；CMake 由生成器与 AUTORCC 机制管理，无对应开关 |
+| `precompile_header` | 按需使用 `target_precompile_headers()`；工程未使用，不默认开启 |
+| `MOC_DIR` / `RCC_DIR` / `UI_DIR` / `OBJECTS_DIR` | CMake 的 AUTOMOC / AUTOUIC / AUTORCC 自动管理中间产物，无需手工指定目录 |
+| `TRANSLATIONS` 清单与 qm 拷贝 | 翻译文件列表与部署路径由各工程通过 `qt_add_translation` + POST_BUILD 拷贝维护 |
+| 第十七节 RC 版本信息 / 图标 | CMake 不自动生成 `.rc`；需要时工程自带 `.rc` 并加入目标源清单 |
+| `QT_NO_KEYWORDS`、`QT_NO_CAST_FROM_ASCII` 等备用宏 | 属代码纪律级开关，需工程侧清理代码后按需在 `target_compile_definitions` 开启 |
+| Android ABI / SDK 版本变量 | Android 打包由 NDK 工具链与 Gradle / `androiddeployqt` 管理，不经本母版 |
 
 ### 默认开启
 
