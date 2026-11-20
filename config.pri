@@ -33,7 +33,7 @@ CONFIG -= debug_and_release
 CONFIG *= lrelease
 #CONFIG *= embed_translations
 # 预编译头支持（Qt6 qmake 不支持该特性，仅 Qt5 启用；具体头文件由工程 PRECOMPILED_HEADER 指定）
-!greaterThan(QT_MAJOR_VERSION, 5): CONFIG *= precompile_header
+lessThan(QT_MAJOR_VERSION, 6): CONFIG *= precompile_header
 
 # Release 下保留日志上下文（文件名、函数名、行号），便于定位问题
 DEFINES *= QT_MESSAGELOGCONTEXT
