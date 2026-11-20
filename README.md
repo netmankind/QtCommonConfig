@@ -31,8 +31,9 @@ include(config.pri)
 include(${CMAKE_CURRENT_SOURCE_DIR}/QtCommonConfig/config.cmake)
 
 add_executable(foo ...)
-qt_common_configure_target(foo)     # 通用宏 / 编译器选项 / 系统库补全
-qt_common_set_output_dir(foo)       # 影子构建输出目录（可选）
+qt_common_configure_target(foo)                    # 通用宏 / 编译器选项 / 系统库补全
+qt_common_set_output_dir(foo)                      # 影子构建输出目录（可选）
+qt_common_refresh_version_on_build(foo)            # 每次构建刷新版本时间（对应 version_stamp，可选）
 ```
 
 可选开关变量（include 之前设置）：`QT_COMMON_KEEP_DEPRECATED`、`QT_COMMON_STRICT_WARNINGS`、`QT_COMMON_NO_WARNINGS`、`QT_COMMON_STATIC_RUNTIME`，含义与 `config.pri` 的同名 CONFIG 开关一致。

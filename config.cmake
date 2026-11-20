@@ -172,3 +172,28 @@ function(qt_common_add_git_hash target)
     target_compile_definitions(${target} PRIVATE APP_BUILD_GIT="${git_hash}")
 
 endfunction()
+
+# -----------------------------------------------------------------------------
+# 每次构建刷新版本源文件（对应 config.pri 第十五节 version_stamp）
+# 版本源文件内使用 __DATE__/__TIME__ 取构建时间；pri 做法是删除 version 目标
+# 文件强制重编，CMake 等价做法是每次构建 touch 源文件使其重新编译。
+# 参数：
+#   target        —— 主可执行目标名
+#   version_source —— 版本源文件路径（可选，默认 <工程目录>/version.cpp）
+# -----------------------------------------------------------------------------
+function(qt_common_refresh_version_on_build target)
+
+    if(ARGC GREATER 1)
+        set(version_source "${ARGV1}")
+    else()
+        set(version_source "${CMAKE_CURRENT_SOURCE_DIR}/version.cpp")
+    endif()
+
+    # 独立 ALL 目标：每次构建先 touch 版本源文件，再编译主目标
+    add_custom_target(${target}_refresh_version ALL
+        COMMAND ${CMAKE_COMMAND} -E touch "${version_source}"
+        COMMENT "Touching ${version_source} to refresh build time"
+    )
+    add_dependencies(${target} ${target}_refresh_version)
+
+endfunction()
