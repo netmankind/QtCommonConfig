@@ -60,6 +60,7 @@ qt_common_deploy_windows(foo)                      # Windows 构建后 windeploy
 | 第十七节 RC 版本信息 / 图标 | CMake 不自动生成 `.rc`；需要时工程自带 `.rc` 并加入目标源清单 |
 | `QT_NO_KEYWORDS`、`QT_NO_CAST_FROM_ASCII` 等备用宏 | 属代码纪律级开关，需工程侧清理代码后按需在 `target_compile_definitions` 开启 |
 | Android ABI / SDK 版本变量 | Android 打包由 NDK 工具链与 Gradle / `androiddeployqt` 管理，不经本母版 |
+| CPU 核数（`QMAKE_HOST.cpu_count`） | CMake 无可靠跨平台内置变量；`print_build_info` 仅输出系统 / 架构 / 位数 / 编译器 / Qt 版本 |
 
 ### 默认开启
 

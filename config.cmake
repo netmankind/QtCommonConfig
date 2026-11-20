@@ -230,10 +230,15 @@ endfunction()
 # -----------------------------------------------------------------------------
 function(qt_common_print_build_info)
 
+    # 按指针宽度换算位数，避免直接输出 sizeof(void*) 的字节数
+    set(bits 32)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(bits 64)
+    endif()
+
     message(STATUS "[QtCommonConfig] Qt ${QT_VERSION} (major ${QT_VERSION_MAJOR})")
     message(STATUS "[QtCommonConfig] Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-    message(STATUS "[QtCommonConfig] System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR} "
-        "(${CMAKE_SIZEOF_VOID_P}-bit, ${CMAKE_HOST_NUMBER_OF_PROCESSORS} cores)")
+    message(STATUS "[QtCommonConfig] System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR} (${bits}-bit)")
 
 endfunction()
 
